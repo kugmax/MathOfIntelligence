@@ -1,10 +1,12 @@
 import random
 from base64 import b64decode
+from concurrent.futures import ProcessPoolExecutor
 from json import loads
 import numpy as np
 import matplotlib.pyplot as plt
 
 img_size = 28
+executor = ProcessPoolExecutor()
 
 
 def parse(x):
