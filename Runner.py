@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
-from Fao import Fao, FaoYearsColumnInfo
+import pandas as pd
 
 
 def main():
@@ -63,16 +62,17 @@ def compute_error_for_line_given_points(b, m, points):
 
 
 def gradient_decrees():
-    fao = Fao('FAO.csv')
-    rows = fao.get_all_country_supply(country="USA", product=2513)
+    df = pd.read_csv(filepath_or_buffer='FAO.csv', encoding='cp1252')
 
-    X = map(lambda string: float(string) if string.strip() else 0.0,
-            rows[0][
-            FaoYearsColumnInfo.BEGIN_INDEX: int(FaoYearsColumnInfo.BEGIN_INDEX) + int(FaoYearsColumnInfo.COUNT)])
+    rows = df[(df['Area Abbreviation'] == 'FRA') & (df['Item Code'] == 2513)]\
+        .fillna(0)\
+        .values
 
-    Y = map(lambda string: float(string) if string.strip() else 0.0,
-            rows[1][
-            FaoYearsColumnInfo.BEGIN_INDEX: int(FaoYearsColumnInfo.BEGIN_INDEX) + int(FaoYearsColumnInfo.COUNT)])
+    X = rows[0, 10:]
+    Y = rows[1, 10:]
+
+    print('X=', X)
+    print('Y=', Y)
 
     points = [[]]
     for i in range(len(X)):
