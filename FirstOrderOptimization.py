@@ -61,22 +61,5 @@ def newtons_method(f, df, x0, e):
     print("f(x) at root is: %0.4f" % f(x0))
 
 
-"""
-def newton(X, Y, tol):
-    W = np.array([0.0, 0.0, 0.0])
-    error = 10
-    steps = 0
-    while error > tol:
-        l1 = Loss(W) #?
-        steps += 1
-        for i in range(N):
-            H = hessian(X, N, W) #2
-            G = gradL(X, Y, W) #f1
-            W = W - np.dot(np.linalg.pinv(H), G)
-        l2 = Loss(W)
-        error = np.abs(l2 - l1)
-    return W, error, steps
-"""
-
 if __name__ == "__main__":
     main()
