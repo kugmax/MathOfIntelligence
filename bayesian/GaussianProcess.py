@@ -27,14 +27,14 @@ def cov(kernel, gp_sampled_x, new_points):
 # new_points is a (num_points,amb_dim) shape matrix of prospective points at which to
 # measure the cross-entropy (on the validation set)
 def expected_improv(kernel, GP_sampled_x, GP_sampled_y, new_points):
-    # compute the mean of the gaussian process at new_points
+    # compute the mean of the bayesian process at new_points
     mu = tf.reshape(mean(kernel, GP_sampled_x, GP_sampled_y, new_points), [-1])
     # compute the standard deviation across those new_points
     sigma = tf.diag_part(cov(kernel, GP_sampled_x, new_points))
     # check that the standard deviation is positive (and fill in a dummy value of 1 otherwise)
     non_zero_variance = tf.greater(sigma, 0., name="variance_Control_Op")
     sigma_safe = tf.select(non_zero_variance, sigma, tf.tile(tf.constant([1.]), tf.shape(sigma)))
-    # model our expected cross-entropy at those new points using the gaussian process
+    # model our expected cross-entropy at those new points using the bayesian process
     normal_distribution = dist.Normal(mu=mu, sigma=sigma_safe)
     # compare our model with the current minimum
     min_sampled_y = tf.reshape(tf.reduce_min(GP_sampled_y), [-1])

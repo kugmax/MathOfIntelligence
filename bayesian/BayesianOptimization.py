@@ -4,7 +4,9 @@ import numpy as np
 import pandas as pd
 from numpy import pi
 import matplotlib.pyplot as plt
-import gaussian.GaussianProcess as gp
+import bayesian.GaussianProcess as gp
+from bayesian.DataHolder import DataHolder
+from bayesian.StudentTModelDistribution import StudentTModelDistribution
 
 testing_proportion = 0.2
 validation_proportion = 0.2
@@ -18,141 +20,75 @@ initial_GP_test_points = 5  # these are randomly chosen points with which to ini
 total_GP_test_points = 20  # total number of points used in bayesian optimization
 max_feelers = 10  # number of points used in batch-gradient-descent optimization.
 
-df = pd.read_csv(filepath_or_buffer='FAO.csv', encoding='cp1252')
 
-rows = df[(df['Area Abbreviation'] == 'FRA') & (df['Item Code'] == 2513)]\
-    .fillna(0) \
-    .values
-data = rows[0:2, 10:]
+def load_data():
+    df = pd.read_csv(filepath_or_buffer='FAO.csv', encoding='cp1252')
 
-x_min, x_max = np.min(data[0]) - 1, np.max(data[0]) + 1
-y_min, y_max = np.min(data[1]) - 1, np.max(data[1]) + 1
+    rows = df[(df['Area Abbreviation'] == 'FRA') & (df['Item Code'] == 2513)]\
+        .fillna(0) \
+        .values
+    data = rows[0:2, 10:]
 
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
-ax1.set_xlim(x_min, x_max)
-ax1.set_ylim(y_min, y_max)
-ax2.set_xlim(x_min, x_max)
-ax1.plot(data[0], data[1], 'ro')
-ax2.plot(data[0], data[1], 'ro')
-plt.show()
-
-_, data_len = data.shape
-
-test_data_len = int(np.floor(data_len * testing_proportion))
-valid_data_len = int(np.floor(data_len * validation_proportion))
-test_data = data[:, test_data_len:]
-train_and_valid_data = data[:, test_data_len:]
-
-x = tf.placeholder(tf.float32, shape=[None])
-y_ = tf.placeholder(tf.float32, shape=[None])
-l2_reg_strength = tf.placeholder(tf.float32, shape=[hyper_param_dim])
-
-with tf.variable_scope('model'):
-    a = tf.Variable(initial_value=tf.constant(0.), name="slope_of_mode")
-    b = tf.Variable(initial_value=tf.constant(0.), name="x_intercept_of_mode")
-    y = a * x + b
-
-    log_bias_scale = tf.Variable(tf.constant(0.), name="scale_log_bias")
-    arg_min_scale = tf.Variable(tf.constant(0, tf.float32), name="scale_arg_min")
-    slope_scale = tf.Variable(tf.constant(1.), name="scale_log_slope")
-    pow_scale = tf.Variable(tf.constant(.5, name='power_for_scale'))
-    scale = tf.pow(tf.square(slope_scale * (x-arg_min_scale))
-                   / tf.exp(log_bias_scale)+1., pow_scale, name="scale") * tf.exp(log_bias_scale)
-
-    log_bias_shape = tf.Variable(tf.constant(0.), name="shape_log_bias")
-    arg_min_shape = tf.Variable(tf.constant(0, tf.float32),name="shape_arg_min")
-    slope_shape = tf.Variable(tf.constant(1.), name="shape_log_slope")
-    pow_shape = tf.Variable(tf.constant(-.5, name='power_for_shape'))
-    shape = tf.pow(tf.square(slope_shape * (x-arg_min_shape))/tf.exp(log_bias_shape) + 1.,
-                   pow_shape, name="shape") * tf.exp(log_bias_shape)
-
-model_distribution = dist.StudentT(df=shape, loc=y, scale=scale)
-
-log_likelihoods = model_distribution.log_prob(y_)
-
-cross_entropy = -tf.reduce_mean(log_likelihoods)
-
-with tf.variable_scope('training_model'):
-    model_lr = tf.placeholder(tf.float32)
-    optimizer = tf.train.AdamOptimizer(model_lr)
-    # the gradient descent objective incorporates our priors via L2 regularization to compute the MAP
-
-    tensorArray = tf.stack(
-        [tf.nn.l2_loss(slope_scale), tf.nn.l2_loss(pow_scale - .5),
-         tf.nn.l2_loss(slope_shape), tf.nn.l2_loss(pow_shape + .5),
-         tf.nn.l2_loss(arg_min_scale), tf.nn.l2_loss(arg_min_shape)]
-    )
-
-    train = optimizer.minimize(
-        cross_entropy + tf.reduce_sum(tf.multiply(l2_reg_strength, tensorArray))
-    )
+    return data
 
 
-def train_and_valid_set_split():
-    valid_data = train_and_valid_data[:, :valid_data_len]
-    train_data = train_and_valid_data[:, valid_data_len:]
-    return train_data,valid_data
-
-
-def train_model(l2_reg_strength_val, num_steps=1000, verbose=False, learning_rate=0.05):
-    # First we initialize the variables in the model and the training optimizer:
-    model_variables = tf.get_collection(tf.GraphKeys.VARIABLES, scope='model')
-    tf.initialize_variables(model_variables).run()
-    training_variables = tf.get_collection(tf.GraphKeys.VARIABLES, scope='training_model')
-    tf.initialize_variables(training_variables).run()
-    # Next we split the training/validation data:
-    train_data, valid_data = train_and_valid_set_split()
-    for step in range(num_steps + 1):
-        training_loss, _ = sess.run([cross_entropy, train],
-                                    {x: train_data[0, :],
-                                     y_: train_data[1, :],
-                                     l2_reg_strength: l2_reg_strength_val,
-                                     model_lr: learning_rate})
-        if verbose and step % 100 == 0:
-            print("step: %d, loss: %.3f, a: %.4f, b: %.4f, min scale: %.4f, scale rate of change: %.4f, \n \
-                     min shape: %.4f shape rate of change: %.2f"
-                  % (step, training_loss, a.eval(), b.eval(),
-                     tf.exp(log_bias_scale).eval(), tf.abs(slope_scale).eval(),
-                     tf.exp(log_bias_shape).eval(), tf.abs(slope_shape).eval()))
-
-    return cross_entropy.eval({x: valid_data[0, :], y_: valid_data[1, :]})
-
-
-def plot_model():
-    x_step_size = (x_max - x_min) / 20.
-    y_step_size = (y_max - y_min) / 20.
-    x_grid = np.arange(x_min, x_max, x_step_size)
-    y_grid = np.arange(y_min, y_max, y_step_size)
+def plot_model(student_t, data_holder):
+    x_step_size = (data_holder.get_x_max() - data_holder.get_x_min()) / 20.
+    y_step_size = (data_holder.get_y_max() - data_holder.get_y_min()) / 20.
+    x_grid = np.arange(data_holder.get_x_min(), data_holder.get_x_max(), x_step_size)
+    y_grid = np.arange(data_holder.get_y_min(), data_holder.get_y_max(), y_step_size)
     fig, ax = plt.subplots()
+
+    params = student_t.get_params()
 
     # Plot the predicted probability density
     X, Y = np.meshgrid(x_grid, y_grid)
-    Z = np.exp(log_likelihoods.eval({x: X.reshape(-1), y_: Y.reshape(-1)})).reshape(len(x_grid), len(y_grid))
+    Z = np.exp(student_t.get_log_likelihoods().eval(
+        {params.x: X.reshape(-1), params.y_: Y.reshape(-1)})
+    ).reshape(len(x_grid), len(y_grid))
+
     ax.contourf(X, Y, Z, cmap='YlGn')
     ax.autoscale(False)
 
     # plot the predicted mode
-    ax.plot(x_grid, a.eval() * x_grid + b.eval(), linewidth=2)
+    ax.plot(x_grid, params.a.eval() * x_grid + params.b.eval(), linewidth=2)
 
     # plot the standard deviation
     # first, restrict to where it's defined
-    x_std_dev_defined = x_grid[shape.eval({x: x_grid}) > 2]
+    x_std_dev_defined = x_grid[params.shape.eval({params.x: x_grid}) > 2]
     # then compute the standard deviation
-    std_dev = (scale * tf.sqrt((shape / (shape - 2.)))).eval({x: x_std_dev_defined})
+    std_dev = (params.scale * tf.sqrt((params.shape / (params.shape - 2.)))).eval({params.x: x_std_dev_defined})
     # now plot it
-    ax.plot(x_std_dev_defined, a.eval() * x_std_dev_defined + b.eval() + std_dev, 'purple')
-    ax.plot(x_std_dev_defined, a.eval() * x_std_dev_defined + b.eval() - std_dev, 'purple')
+    ax.plot(x_std_dev_defined, params.a.eval() * x_std_dev_defined + params.b.eval() + std_dev, 'purple')
+    ax.plot(x_std_dev_defined, params.a.eval() * x_std_dev_defined + params.b.eval() - std_dev, 'purple')
 
-    ax.plot(data[0], data[1], 'ro')
+    ax.plot(data_holder.get_data()[0], data_holder.get_data()[1], 'ro')
     plt.show()
 
 
-sess = tf.InteractiveSession()
-print("-"*30+"\n validation-cross-entropy estimate: %f"
-      %train_model(l2_reg_strength_val=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                   num_steps=10000, learning_rate=0.005, verbose=True))
+def main():
+    data = load_data()
+    data_holder = DataHolder(data)
+    data_holder.plot_data()
 
-plot_model()
+    _, data_len = data.shape
+    test_data_len = int(np.floor(data_len * testing_proportion))
+    valid_data_len = int(np.floor(data_len * validation_proportion))
+    test_data = data[:, test_data_len:]
+    train_and_valid_data = data[:, test_data_len:]
+
+    student_t = StudentTModelDistribution(tf, valid_data_len, train_and_valid_data, hyper_param_dim)
+    model_train = student_t.build_train_model(tf)
+
+    result_cross_entropy = student_t.train_model(tf=tf, train=model_train,
+                                                 l2_reg_strength_val=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                                                 num_steps=10000, learning_rate=0.005)
+
+    print("-" * 30 + "\n validation-cross-entropy estimate: %f"
+          % result_cross_entropy)
+
+    plot_model(student_t, data_holder)
+
 
 #
 # def matern_kernel(points_1, points_2, log_length_scale, log_sample_noise=None, log_kernel_scale=0.):
@@ -455,5 +391,5 @@ plot_model()
 #              np.sqrt(GP_min_point_est[3])))
 #
 #
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
