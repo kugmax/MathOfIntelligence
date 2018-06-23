@@ -216,7 +216,7 @@ def find_gp_test_point(sess, gp_train, model_train, student_t, kernel, gp, gp_pa
             sample_values = np.append(sample_values,
                                       [student_t.train_model(tf=tf, sess=sess, train=model_train,
                                                              l2_reg_strength_val=sample_points[-1, :],
-                                                             num_steps=500, learning_rate=.1)],
+                                                             num_steps=1000, learning_rate=.1)],
                                       axis=0)
             log_sample_values = np.append(log_sample_values, [np.log(sample_values[-1])], axis=0)
         else:
@@ -278,7 +278,7 @@ def do_optimization(sess, model_train, student_t):
     for i in range(initial_GP_test_points):
         sample_values += [student_t.train_model(tf=tf, sess=sess, train=model_train,
                                                 l2_reg_strength_val=sample_points[i, :],
-                                                num_steps=500,
+                                                num_steps=1000,
                                                 learning_rate=.1)
                           ]
     log_sample_values = np.log(sample_values)
@@ -321,7 +321,8 @@ def main():
     gp_min_point_est = do_optimization(sess, model_train, student_t)
 
     test_set_cross_entropy = student_t.train_model(tf=tf, sess=sess, train=model_train,
-                                                   l2_reg_strength_val=gp_min_point_est)
+                                                   l2_reg_strength_val=gp_min_point_est,
+                                                   num_steps=10000, learning_rate=0.005)
     plot_model(student_t, data_holder)
     print("Test Set Cross Entropy Error: %.4f" % test_set_cross_entropy)
 
