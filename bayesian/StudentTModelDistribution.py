@@ -57,13 +57,12 @@ class StudentTModelDistribution:
                                          self._params.y_: self._train_data[1, :],
                                          self._l2_reg_strength: l2_reg_strength_val,
                                          self._model_lr: learning_rate})
-            if step % 100 == 0:
-                print("step: %d, loss: %.3f, a: %.4f, b: %.4f, min scale: %.4f, scale rate of change: %.4f, \n \
-                         min shape: %.4f shape rate of change: %.2f"
-                      % (step, training_loss, self._params.a.eval(), self._params.b.eval(),
-                         tf.exp(self._params.log_bias_scale).eval(), tf.abs(self._params.slope_scale).eval(),
-                         tf.exp(self._params.log_bias_shape).eval(), tf.abs(self._params.slope_shape).eval()))
+            # if step % 100 == 0:
+            #     print("step: %d, loss: %.3f, a: %.4f, b: %.4f, min scale: %.4f, scale rate of change: %.4f, \n \
+            #              min shape: %.4f shape rate of change: %.2f"
+            #           % (step, training_loss, self._params.a.eval(), self._params.b.eval(),
+            #              tf.exp(self._params.log_bias_scale).eval(), tf.abs(self._params.slope_scale).eval(),
+            #              tf.exp(self._params.log_bias_shape).eval(), tf.abs(self._params.slope_shape).eval()))
 
         return self._cross_entropy.eval({self._params.x: self._valid_data[0, :],
                                          self._params.y_: self._valid_data[1, :]})
-

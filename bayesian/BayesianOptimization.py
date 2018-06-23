@@ -92,7 +92,7 @@ def prepare_model(sess):
 
     plot_model(student_t, data_holder)
 
-    return model_train, student_t
+    return model_train, student_t, data_holder
 
 
 def fit_GP(sess, gp, sampled_x, sampled_y, gp_params, gp_train):
@@ -103,11 +103,11 @@ def fit_GP(sess, gp, sampled_x, sampled_y, gp_params, gp_train):
                            {gp_params.sampled_x: sampled_x,
                             gp_params.sampled_y: sampled_y})
 
-        print("step: %d, loss: %.4f" % (i, loss))
-        print("length scale: %.3f, Sample Noise: %.3f, Kernel Scale: %f" %
-              (tf.exp(gp_params.log_length_scale).eval()[0],
-               tf.exp(gp_params.log_sample_noise).eval(),
-               tf.exp(gp_params.log_kernel_scale).eval()))
+        # print("step: %d, loss: %.4f" % (i, loss))
+        # print("length scale: %.3f, Sample Noise: %.3f, Kernel Scale: %f" %
+        #       (tf.exp(gp_params.log_length_scale).eval()[0],
+        #        tf.exp(gp_params.log_sample_noise).eval(),
+        #        tf.exp(gp_params.log_kernel_scale).eval()))
 
 
 def plot_GP_model(sampled_x, sampled_y, gp_params, gp_mean_func):
@@ -311,17 +311,19 @@ def do_optimization(sess, model_train, student_t):
              np.sqrt(gp_min_point_est[2]),
              np.sqrt(gp_min_point_est[3])))
 
-    # train_model(l2_reg_strength_val=GP_min_point_est, verbose=True)
-    # plot_model(ylim=[-10, 20])
-    # test_set_cross_entropy = cross_entropy.eval({x: test_data[:, 0], y_: test_data[:, 1]})
-    # print("Test Set Cross Entropy Error: %.4f" % test_set_cross_entropy)
+    return gp_min_point_est
 
 
 def main():
     sess = tf.InteractiveSession()
 
-    model_train, student_t = prepare_model(sess)
-    do_optimization(sess, model_train, student_t)
+    model_train, student_t, data_holder = prepare_model(sess)
+    gp_min_point_est = do_optimization(sess, model_train, student_t)
+
+    test_set_cross_entropy = student_t.train_model(tf=tf, sess=sess, train=model_train,
+                                                   l2_reg_strength_val=gp_min_point_est)
+    plot_model(student_t, data_holder)
+    print("Test Set Cross Entropy Error: %.4f" % test_set_cross_entropy)
 
 
 if __name__ == "__main__":
