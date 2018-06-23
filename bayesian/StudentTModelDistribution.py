@@ -43,8 +43,7 @@ class StudentTModelDistribution:
 
             return train
 
-    def train_model(self, tf, train, l2_reg_strength_val, num_steps=1000, learning_rate=0.05):
-        sess = tf.InteractiveSession()
+    def train_model(self, tf, sess, train, l2_reg_strength_val, num_steps=1000, learning_rate=0.05):
 
         model_variables = tf.get_collection(tf.GraphKeys.VARIABLES, scope='model')
         tf.initialize_variables(model_variables).run()
