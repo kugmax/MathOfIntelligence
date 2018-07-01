@@ -66,26 +66,90 @@ def calculate_max_reward(board, actions_states, state):
     return max_reward
 
 
-def main():
+def chose_A(use_max, actions_states, current_state, board):
+    A = None
+    max_reward = -9999999999
+    if use_max == 1:
+        for a in actions_states[current_state]:
+            next_state = tuple(move(current_state[0], current_state[1], a))
+            reward = board[next_state[0]][next_state[1]]
+            if reward > max_reward:
+                max_reward = reward
+                A = a
+
+    else:
+        A = np.random.choice(actions_states[current_state])
+
+    return A
+
+
+def sarsa():
     board = prepare_board()
     actions_states = prepare_actions(board)
 
     e = 0.1
     q_s_a = [[1 for j in range(12)] for i in range(4)]
+    # q_s_a = board.copy()
+    q_s_a[3][11] = 0
 
     for episode in range(1000):
-        sum_rewards_per_episode = 0
         if episode % 100 == 0:
             print("episode: ", episode)
 
         current_state = (3, 0)
+        use_max = np.random.choice([0, 1], p=[e, 1 - e])
+        A_1 = chose_A(use_max, actions_states, current_state, board)
 
+        n = 0
         while current_state != (3, 11):
+            n += 1
+            S_2 = move(current_state[0], current_state[1], A_1)
+            R = board[S_2[0]][S_2[1]]
+
+            # if R == -100:
+            #     S_2 = (3, 0)
+
+            use_max = np.random.choice([0, 1], p=[e, 1 - e])
+            A_2 = chose_A(use_max, actions_states, S_2, board)
+
+            q_s_a_value_2 = q_s_a[S_2[0]][S_2[1]]
+            q_s_a_value = q_s_a[current_state[0]][current_state[1]]
+            q_s_a[current_state[0]][current_state[1]] = \
+                q_s_a_value + 1 / n * (R + 0.9 * q_s_a_value_2 - q_s_a_value)
+
+            current_state = S_2
+            A_1 = A_2
+
+    for i in range(len(q_s_a)):
+        print(["%.2f" % i for i in q_s_a[i]])
+
+
+start_position = (3, 0)
+
+
+def q_learn():
+    board = prepare_board()
+    actions_states = prepare_actions(board)
+
+    e = 0.1
+    q_s_a = [[-999 for _ in range(12)] for _ in range(4)]
+    q_s_a[3][11] = 0
+
+    for episode in range(100):
+        if episode % 100 == 0:
+            print("episode: ", episode)
+
+        current_state = start_position
+
+        alpha = 1.0
+        n = 0
+        while current_state != (3, 11):
+            n += 1
             use_max = np.random.choice([0, 1], p=[e, 1 - e])
 
             max_state = ()
             max_reward = -9999999999
-            if use_max == 1:
+            if use_max:
                 for a in actions_states[current_state]:
                     next_state = tuple(move(current_state[0], current_state[1], a))
                     reward = board[next_state[0]][next_state[1]]
@@ -99,18 +163,21 @@ def main():
                 max_reward = board[max_state[0]][max_state[1]]
 
             if max_reward == -100:
-                max_state = (3, 0)
-            sum_rewards_per_episode += max_reward
-            max_next_reward = calculate_max_reward(board, actions_states, max_state)
+                max_state = start_position
 
+            max_next_reward = calculate_max_reward(q_s_a, actions_states, max_state)
+
+            alpha = pow(n, -0.1)
             q_s_a_value = q_s_a[current_state[0]][current_state[1]]
-            q_s_a[current_state[0]][current_state[1]] = q_s_a_value \
-                                                        + 0.5 * (max_reward + 0.9 * max_next_reward - q_s_a_value)
+            delta = alpha * (max_reward + 0.9 * max_next_reward - q_s_a_value)
+            q_s_a[current_state[0]][current_state[1]] += delta
+
             current_state = max_state
-        # print(sum_rewards_per_episode)
 
     for i in range(len(q_s_a)):
-        print(q_s_a[i])
+        print(["%.2f" % i for i in q_s_a[i]])
+
 
 if __name__ == "__main__":
-    main()
+    q_learn()
+    # sarsa()
